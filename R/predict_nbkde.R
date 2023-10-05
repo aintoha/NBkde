@@ -1,13 +1,15 @@
 # Description: This function to predict the for multiple datasets for naive bayes KDE
 
 # Usage: This function is to predict the probability of the covariates belong to
-#        class y ={0,1}. The testdata must be (n x p) matrix/ data frame where
-#        p is the number of features and is the number of instances.
-#        The bandwidth (h) must be a matrix of (C x p) matrix/ data frame where
+#        class y ={0,1}. The testdata must be (m x p) matrix/ data frame where
+#        p is the number of features and m is the number of instances.
+#        The traindata must a matris with (n x p+1) matrix where n is the number
+#        of training instances and (p+1) is the number of features + target variable.
+#        The bandwidth (h) may be NULL, be a matrix of (C x p) matrix/ data frame where
 #        C is the number of class and p is the number of features in the training data
-#       The prior is computed from the training data. The prior is obtained by
-#       computing the number of observation belonging to a class and divided by the
-#       total number of observation/ instances in the class
+#        The prior is computed from the training data. The prior is obtained by
+#        computing the number of observation belonging to a class and divided by the
+#        total number of observation/ instances in the class
 
 # install.packages("dplyr")
 # install.packages("cvTools")
