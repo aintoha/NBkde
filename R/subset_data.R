@@ -1,13 +1,6 @@
-# Naive Bayes Algorithm using KDE
+#subset.data
 #----------------------------------
-# This R file contains steps to predict the class label using Naive bayes KDE.
-# This algorithm consists of multiple steps that allow users to predict the last label
-# The first step is separating the data as we need estimate the density for the
-# covariates for different class. Then, we present the algorithm for bandwidth selection.
-# Finally, we will compute or the naive Bayes model using the estimated bandwith
-
-
-# 1: Extracting/ Separating Data
+# Objective: Extracting/ Separating data based on class.
 
 # Description: This method that enable to separate the data based on class. This method
 #              takes in data frame. The last column assumed to be the class data. This
@@ -15,7 +8,7 @@
 
 # Usage: subset.data(data)
 
-# Arguments: data: A data frame. The last column is the categorical variable
+# Arguments: data: A data frame. The last column must be the categorical variable
 
 # Value: The output is a list of the C (number of class) data frame
 

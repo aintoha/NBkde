@@ -1,3 +1,5 @@
+# predict ther pdf
+
 # Description: This function to predict the pdf for
 
 # Usage: This function is to predict the probability of the covariates belong to
