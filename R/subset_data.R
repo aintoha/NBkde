@@ -14,11 +14,11 @@
 
 # Example:
 
-#     data = PlantGrowth
-#     a = subset.data(data)
-#     a[1]
-#     a[2]
-#     a[3]
+    # data = PlantGrowth
+    # a = subset.data(data)
+    # a[1]
+    # a[2]
+    # a[3]
 
 
 #     data = iris

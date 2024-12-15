@@ -1,0 +1,76 @@
+# Load Rcpp package
+library(Rcpp)
+
+# Define the C++ function
+cppFunction('
+#include <Rcpp.h>
+#include <cmath>
+using namespace Rcpp;
+
+// Approximate the error function (erf) for demonstration purposes
+double erf_cpp(double x) {
+  return std::erf(x); 
+}
+
+// [[Rcpp::export]]
+double gaussian_ibl_single(double xtest, NumericVector xtrain, double h) {
+  
+  int n = xtrain.size();  // length of train
+  
+  // Create vectors to hold the differences
+  NumericVector dif(n);
+  for (int i = 0; i < n; ++i) {
+    dif[i] = xtrain[i] - xtest;
+  }
+  
+  // Calculate the first term: erf_dif
+  NumericVector erf_dif(n);
+  for (int i = 0; i < n; ++i) {
+    erf_dif[i] = dif[i] * erf_cpp(dif[i] / h);
+  }
+  
+  // Calculate the second term: exp_dif
+  NumericVector exp_dif(n);
+  for (int i = 0; i < n; ++i) {
+    exp_dif[i] = exp(-(dif[i] * dif[i]) / (2 * h * h));
+  }
+  
+  // Calculate the third term: dif_train
+  NumericVector dif_train(n);
+  for (int i = 0; i < n; ++i) {
+    dif_train[i] = xtrain[i] - xtest;
+  }
+  
+  // Calculate the fourth term: erf_dif_train
+  NumericVector erf_dif_train(n);
+  for (int i = 0; i < n; ++i) {
+    erf_dif_train[i] = dif_train[i] * erf_cpp(dif_train[i] / (2 * h));
+  }
+  
+  // Calculate the fifth term: exp_dif_train
+  NumericVector exp_dif_train(n);
+  for (int i = 0; i < n; ++i) {
+    exp_dif_train[i] = exp(-(dif_train[i] * dif_train[i]) / (4 * h * h));
+  }
+  
+  // Compute the final score
+  double sum_erf_dif = sum(erf_dif);
+  double sum_exp_dif = sum(exp_dif);
+  double sum_erf_dif_train = sum(erf_dif_train);
+  double sum_exp_dif_train = sum(exp_dif_train);
+
+  double score = (1.0 / n) * sum_erf_dif + (h * sqrt(2.0 / M_PI) * (1.0 / n) * sum_exp_dif) -
+                 (1.0 / (2.0 * n * n)) * sum_erf_dif_train - (h / (n * n * sqrt(M_PI))) * sum_exp_dif_train;
+
+  return score;
+}
+')
+
+# Now you can use the gaussian_ibl_single function from R
+xtrain <- c(1.0, 2.0, 3.0, 4.0, 5.0)  # Example training data
+xtest <- 2.5  # Example test point
+h <- 1.0  # Example bandwidth
+
+score <- gaussian_ibl_single(xtest, xtrain, h)
+print(score)
+

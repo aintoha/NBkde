@@ -19,15 +19,13 @@
 # Values:
 
 # Example
+#-------------------
+# traindata = iris[c(1:10, 51:60, 101:110),]
+# testdata = as.matrix(iris[c(49, 50, 99, 100,149, 150), -5])
+# h = NULL
+# pdf = predict_nbkde(traindata=traindata, testdata=testdata, h = h)
+# pdf
 
-traindata = iris[c(1:10, 51:60, 101:110),]
-testdata = as.matrix(iris[c(49, 50, 99, 100,149, 150), -5])
-h = NULL
-h = c(0.1, 0.1, 0.1, 0.3, 0.3, 0.3, 0.4, 0.5, 0.6, 0.6, 0.6, 0.7)
-pdf = predict_nbkde(traindata=traindata, testdata=testdata, h = h)
-pdf
-
-library(dplyr)
 predict_nbkde = function(traindata, testdata, h) {
 
       n_x = ncol(traindata) # no. of column in test data
@@ -36,7 +34,7 @@ predict_nbkde = function(traindata, testdata, h) {
 
       n_test = nrow(testdata) # no. of instances in testdata
 
-      n_train = nrow(traindata)
+      n_train = nrow(traindata) # no. of instances in traindata
 
       sort_traindata = dplyr::arrange(traindata, traindata[,n_x])
 

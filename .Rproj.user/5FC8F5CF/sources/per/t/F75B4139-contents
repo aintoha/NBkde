@@ -1,0 +1,386 @@
+#Boston housing 
+#===============
+
+#1. Log-loss
+source("functions_file.R")
+library(MASS)
+library(cvTools)
+data <- read.table("auto.txt", header=F)
+mydata <- as.data.frame(data[,1])
+mydata
+#############################################
+##############################
+#grid search
+#bw: bandwidth
+#loss_in: empircal loss in the in-sample
+#est_density_in: estimated density in the in-sample
+#loss: empirical loss in out-of-sample
+#est_density_out: estimate density in the out-of-sample
+#se_loss_in: 
+set.seed(5202)
+bw  <- 2^seq(from=-4, to= 4, by=1)
+bw
+length_bandwidth <- length(bw)
+numouterfolds <- 10
+numinnerfolds <- 10
+folds <- cvFolds(NROW(mydata), K=numouterfolds)
+
+logloss_grid_in <- array(NA, dim=c(numouterfolds,  numinnerfolds, length_bandwidth))
+logloss_grid_out <- rep(NA, numouterfolds)
+se_logloss_grid_out <- rep(NA,numouterfolds)
+
+for(outerfolds in 1:numouterfolds){
+  
+  others_data <- splitfolder(mydata, folds, outerfolds)[[1]]
+  test_data <- splitfolder(mydata, folds, outerfolds)[[2]]
+  infolds <- cvFolds(NROW(others_data), K=numinnerfolds)
+  
+  
+  for(h in 1:length(bw)){
+    
+    for(innerfolds in 1:numinnerfolds){
+      
+      train_data <- splitfolder(as.data.frame(others_data), infolds, innerfolds)[[1]]
+      validation_data <- splitfolder(as.data.frame(others_data), infolds, innerfolds)[[2]]
+      logloss_grid_in[outerfolds,innerfolds,] <- unlist(V.logloss(logh=log(bw), obsdata=train_data,testdata= validation_data))
+      
+    }
+    
+    #   optimal_bw <- bw[which.min(mean_loss_in)]
+    #   loss_out[outerfolds] <- unlist(V.logloss(logh=log(optimal_bw), obsdata=others_data, testdata=test_data))
+    #   se_loss_out[outerfolds] <- se.logloss(data=others_data, testdata=test_data, logbw=log(optimal_bw))
+    
+  }
+}
+
+
+#model selection
+mean_logloss_grid_in <- apply(logloss_grid_in,c(1,3),mean)
+mean_logloss_grid_in
+#the parameter is performed 5 times and the models are selected
+minh <- which(mean_logloss_grid_in == min(mean_logloss_grid_in), arr.ind = T)[2]
+minh
+
+#out of sample error
+for(outerfolds in 1:numouterfolds){
+  
+  others_data <- splitfolder(mydata, folds, outerfolds)[[1]]
+  test_data <- splitfolder(mydata, folds, outerfolds)[[2]]
+  
+  logloss_grid_out[outerfolds] <- unlist(V.logloss(logh=log(bw[minh]), obsdata=others_data, testdata=test_data))
+  se_logloss_grid_out[outerfolds] <- se.logloss(data=others_data, testdata=test_data, logbw=log(bw[minh]))
+  
+}
+
+result_logloss_grid <- list(logloss_grid_out,se_logloss_grid_out, 
+                            mean(logloss_grid_out), 
+                            mean(se_logloss_grid_out))
+
+result_logloss_grid 
+
+#######################################################################
+#========================================
+
+
+logloss_gridnlm_in <- matrix(NA,  numouterfolds, numinnerfolds)
+bandwidth_logloss_gridnlm_in <-  matrix(NA,  numouterfolds, numinnerfolds)
+logloss_gridnlm_out <- rep(NA, numouterfolds)
+se_logloss_gridnlm_out <- rep(NA, numouterfolds)
+
+for(outerfolds in 1:numouterfolds){
+  
+  others_data <- splitfolder(mydata, folds, outerfolds)[[1]]
+  test_data <- splitfolder(mydata, folds, outerfolds)[[2]]
+  
+  infolds <- cvFolds(NROW(others_data), K=numinnerfolds)
+  
+  for(innerfolds in 1:numinnerfolds){
+    
+    train_data <- splitfolder(as.data.frame(others_data), infolds, innerfolds)[[1]]
+    validation_data <- splitfolder(as.data.frame(others_data), infolds, innerfolds)[[2]]
+    logloss_gridnlm_in[outerfolds,innerfolds] <- nlm(logloss, p = log(bw[minh]), 
+                                                     obsdata=train_data, testdata=validation_data)$minimum
+    bandwidth_logloss_gridnlm_in[outerfolds, innerfolds] <- nlm(logloss, p = log(bw[minh]), 
+                                                                obsdata=train_data, testdata=validation_data)$estimate
+  }
+  
+  
+}
+
+mean_logloss_gridnlm_in <- colMeans(logloss_gridnlm_in)
+mean_bandwidth_logloss_gridnlm_in <- colMeans(bandwidth_logloss_gridnlm_in)
+min_logloss_gridnlm_in <- which(mean_logloss_gridnlm_in == min(mean_logloss_gridnlm_in), arr.ind = T)
+bw_logloss_gridnlm <- mean_bandwidth_logloss_gridnlm_in[min_logloss_gridnlm_in]
+
+
+
+for(outerfolds in 1:numouterfolds){
+  
+  others_data <- splitfolder(mydata, folds, outerfolds)[[1]]
+  test_data <- splitfolder(mydata, folds, outerfolds)[[2]]
+  
+  logloss_gridnlm_out[outerfolds] <- unlist(V.logloss(logh=bw_logloss_gridnlm, 
+                                                      obsdata=others_data, testdata=test_data))
+  se_logloss_gridnlm_out[outerfolds] <- se.logloss(data=others_data, testdata=test_data, 
+                                                   logbw=bw_logloss_gridnlm)
+  
+}
+result_logloss_gridnlm <- list(logloss_gridnlm_out,se_logloss_gridnlm_out, 
+                               mean(logloss_gridnlm_out), 
+                               mean(se_logloss_gridnlm_out))
+result_logloss_gridnlm
+
+######################################################################
+#gradient descent with starting point 3
+#======================================
+
+
+logloss_nlm_in <- matrix(NA, numouterfolds, numinnerfolds)
+bandwidth_logloss_nlm_in <- matrix(NA, numouterfolds, numinnerfolds)
+logloss_nlm_out <- rep(NA, numouterfolds)
+se_logloss_nlm_out <- rep(NA, numouterfolds)
+
+for(outerfolds in 1:numouterfolds){
+  
+  others_data <- splitfolder(mydata, folds, outerfolds)[[1]]
+  test_data <- splitfolder(mydata, folds, outerfolds)[[2]]
+  
+  infolds <- cvFolds(NROW(others_data), K=numinnerfolds)
+  
+  for(innerfolds in 1:numinnerfolds){
+    
+    train_data <- splitfolder(as.data.frame(others_data), infolds, innerfolds)[[1]]
+    validation_data <- splitfolder(as.data.frame(others_data), infolds, innerfolds)[[2]]
+    logloss_nlm_in[outerfolds, innerfolds] <- nlm(logloss, p=log(3), obsdata=train_data, 
+                                                  testdata=validation_data,  
+                                                  hessian=TRUE, check.analyticals = TRUE)$minimum
+    bandwidth_logloss_nlm_in[outerfolds, innerfolds] <- nlm(logloss, p=log(3), obsdata=train_data, 
+                                                            testdata=validation_data,  
+                                                            hessian=TRUE, check.analyticals = TRUE)$estimate
+    
+  }
+  
+}
+
+
+mean_logloss_nlm_in <- colMeans(logloss_nlm_in)
+mean_bandwidth_nlm_in <- colMeans(bandwidth_logloss_nlm_in)
+min_logloss_nlm_in <- which(mean_logloss_nlm_in == min(mean_logloss_nlm_in), arr.ind = T)
+bw_logloss_nlm  <- mean_bandwidth_nlm_in[min_logloss_nlm_in ]
+
+for(outerfolds in 1:numouterfolds){
+  
+  others_data <- splitfolder(mydata, folds, outerfolds)[[1]]
+  test_data <- splitfolder(mydata, folds, outerfolds)[[2]]
+  
+  logloss_nlm_out[outerfolds] <- unlist(V.logloss(logh=bw_logloss_nlm, obsdata=others_data, testdata=test_data))
+  se_logloss_nlm_out[outerfolds] <- se.logloss(data=others_data, testdata=test_data, logbw=bw_logloss_nlm)
+  
+}
+result_logloss_nlm <- list(logloss_nlm_out,se_logloss_nlm_out, 
+                           mean(logloss_nlm_out), 
+                           mean(se_logloss_nlm_out))
+result_logloss_nlm
+
+#===========================
+#2. Integrated sqaured loss
+#===========================
+
+#grid search
+#bw: bandwidth
+#loss_in: empircal loss in the in-sample
+#est_density_in: estimated density in the in-sample
+#loss: empirical loss in out-of-sample
+#est_density_out: estimate density in the out-of-sample
+#se_loss_in: 
+
+
+iseloss_grid_in <- array(NA, dim=c(numouterfolds,  numinnerfolds, length_bandwidth))
+#loss_in <- matrix(NA, numinnerfolds, length_bandwidth)
+iseloss_grid_out <- rep(NA, numouterfolds)
+se_iseloss_grid_out <- rep(NA,numouterfolds)
+
+for(outerfolds in 1:numouterfolds){
+  
+  others_data <- splitfolder(mydata, folds, outerfolds)[[1]]
+  test_data <- splitfolder(mydata, folds, outerfolds)[[2]]
+  infolds <- cvFolds(NROW(others_data), K=numinnerfolds)
+  
+  
+  for(h in 1:length(bw)){
+    
+    for(innerfolds in 1:numinnerfolds){
+      
+      train_data <- splitfolder(as.data.frame(others_data), infolds, innerfolds)[[1]]
+      validation_data <- splitfolder(as.data.frame(others_data), infolds, innerfolds)[[2]]
+      iseloss_grid_in[outerfolds, innerfolds,h] <- gaussian.ise(x=train_data, xtest= validation_data, bw=bw[h])
+      
+    }
+    
+    #   optimal_bw <- bw[which.min(mean_loss_in)]
+    #   loss_out[outerfolds] <- unlist(V.logloss(logh=log(optimal_bw), obsdata=others_data, testdata=test_data))
+    #   se_loss_out[outerfolds] <- se.logloss(data=others_data, testdata=test_data, logbw=log(optimal_bw))
+    
+  }
+}
+
+
+#mean loss for each inner folds
+mean_iseloss_grid_in <- apply(iseloss_grid_in,c(1,3),mean)
+#the parameter is performed 5 times and the models are selected
+bw_iseloss_grid <- which(mean_iseloss_grid_in == min(mean_iseloss_grid_in), arr.ind = T)[2]
+
+
+#plot the for bandwidth tuning 
+mean_bh_ise <- colMeans(mean_iseloss_grid_in)
+png("boston.png", units = "px", width=1600, height=1600, res=100)
+plot(log(bw), mean_bh_ise, type='l', 
+     ylab = "Empirical loss", xlab="Log bandwidth", 
+     main="Plot of Empirical loss  against log bandwidth for
+     Boston Housing")
+dev.off()
+
+#error
+for(outerfolds in 1:numouterfolds){
+  
+  others_data <- splitfolder(mydata, folds, outerfolds)[[1]]
+  test_data <- splitfolder(mydata, folds, outerfolds)[[2]]
+  
+  iseloss_grid_out[outerfolds] <- gaussian.ise(x=others_data,xtest= test_data, bw=bw[bw_iseloss_grid])
+  se_iseloss_grid_out[outerfolds] <- se.gaussian.ise(x=others_data, xtest= test_data, bw=bw[bw_iseloss_grid])
+}
+
+result_iseloss_grid <- list(iseloss_grid_out,se_iseloss_grid_out, 
+                            mean(iseloss_grid_out), 
+                            mean(se_iseloss_grid_out))
+result_iseloss_grid
+
+
+
+
+
+
+#######################################################################
+#Second Method:  grid + gradient descent
+#===========================================
+
+
+iseloss_gridnlm_in <- matrix(NA,  numouterfolds, numinnerfolds)
+bandwidth_iseloss_gridnlm_in <-  matrix(NA,  numouterfolds, numinnerfolds)
+iseloss_gridnlm_out <- rep(NA, numouterfolds)
+se_iseloss_gridnlm_out <- rep(NA, numouterfolds)
+
+for(outerfolds in 1:numouterfolds){
+  
+  others_data <- splitfolder(mydata, folds, outerfolds)[[1]]
+  test_data <- splitfolder(mydata, folds, outerfolds)[[2]]
+  
+  infolds <- cvFolds(NROW(others_data), K=numinnerfolds)
+  
+  for(innerfolds in 1:numinnerfolds){
+    
+    train_data <- splitfolder(as.data.frame(others_data), infolds, innerfolds)[[1]]
+    validation_data <- splitfolder(as.data.frame(others_data), infolds, innerfolds)[[2]]
+    iseloss_gridnlm_in [outerfolds,innerfolds] <- nlm(gaussian.ise, p = bw[bw_iseloss_grid ], 
+                                                      x=train_data, xtest=validation_data, 
+                                                      hessian = T, check.analyticals = T)$minimum
+    bandwidth_iseloss_gridnlm_in[outerfolds, innerfolds] <- nlm(gaussian.ise, p = bw[bw_iseloss_grid ], 
+                                                                x=train_data, xtest=validation_data, 
+                                                                hessian = T, check.analyticals = T)$estimate
+  }
+  
+  
+}
+
+#average of the inner folds
+mean_iseloss_gridnlm_in <- colMeans(iseloss_gridnlm_in)
+mean_bandwidth_gridnlm_in <- colMeans(bandwidth_gridnlm_in)
+#find the minimum 
+min_iseloss_gridnlm_in <- which(mean_iseloss_gridnlm_in == min(mean_iseloss_gridnlm_in), arr.ind = T)
+bw_ise_gridnlm <- mean_bandwidth_gridnlm_in[min_iseloss_gridnlm_in]
+
+for(outerfolds in 1:numouterfolds){
+  
+  others_data <- splitfolder(mydata, folds, outerfolds)[[1]]
+  test_data <- splitfolder(mydata, folds, outerfolds)[[2]]
+  
+  iseloss_gridnlm_out[outerfolds] <- gaussian.ise(x=others_data, 
+                                                  xtest = test_data, bw=bw_ise_gridnlm)
+  se_iseloss_gridnlm_out[outerfolds] <- se.gaussian.ise(x=others_data,
+                                                        xtest = test_data, bw=bw_ise_gridnlm )
+  
+}
+result_iseloss_gridnlm <- list(iseloss_gridnlm_out,se_iseloss_gridnlm_out, 
+                               mean(iseloss_gridnlm_out), 
+                               mean(se_iseloss_gridnlm_out))
+result_iseloss_gridnlm
+
+
+######################################################################
+#gradient descent with starting point 3
+#===========================================
+
+iseloss_nlm_in <- matrix(NA, numouterfolds, numinnerfolds)
+bandwidth_iseloss_nlm_in <- matrix(NA, numouterfolds, numinnerfolds)
+iseloss_nlm_out <- rep(NA, numouterfolds)
+se_iseloss_nlm_out <- rep(NA, numouterfolds)
+
+for(outerfolds in 1:numouterfolds){
+  
+  others_data <- splitfolder(mydata, folds, outerfolds)[[1]]
+  test_data <- splitfolder(mydata, folds, outerfolds)[[2]]
+  
+  infolds <- cvFolds(NROW(others_data), K=numinnerfolds)
+  
+  for(innerfolds in 1:numinnerfolds){
+    
+    train_data <- splitfolder(as.data.frame(others_data), infolds, innerfolds)[[1]]
+    validation_data <- splitfolder(as.data.frame(others_data), infolds, innerfolds)[[2]]
+    iseloss_nlm_in[outerfolds, innerfolds] <- nlm(gaussian.ise, p=3, x=train_data, 
+                                                  xtest=validation_data,  
+                                                  hessian=TRUE, check.analyticals = TRUE)$minimum
+    bandwidth_iseloss_nlm_in[outerfolds, innerfolds] <- nlm(gaussian.ise, p=3, x=train_data, 
+                                                            xtest=validation_data,   
+                                                            hessian=TRUE, check.analyticals = TRUE)$estimate
+    
+  }
+  
+}
+
+#average of the inner folds
+mean_iseloss_nlm_in <- colMeans(iseloss_nlm_in)
+mean_bandwidth_iseloss_nlm_in <- colMeans(bandwidth_iseloss_nlm_in)
+#find the minimum 
+min_iseloss_nlm_in <- which(mean_iseloss_nlm_in == min(mean_iseloss_nlm_in), arr.ind = T)
+bw_iseloss_nlm <- mean_bandwidth_iseloss_nlm_in[min_iseloss_nlm_in ]
+
+for(outerfolds in 1:numouterfolds){
+  
+  others_data <- splitfolder(mydata, folds, outerfolds)[[1]]
+  test_data <- splitfolder(mydata, folds, outerfolds)[[2]]
+  
+  iseloss_nlm_out[outerfolds] <- gaussian.ise(x=others_data, xtest = test_data, bw=bw_iseloss_nlm)
+  se_iseloss_nlm_out[outerfolds] <- se.gaussian.ise(x=others_data, xtest = test_data, bw=bw_iseloss_nlm)
+  
+}
+
+result_iseloss_nlm <- list(iseloss_nlm_out,se_iseloss_nlm_out, 
+                           mean(iseloss_nlm_out), 
+                           mean(se_iseloss_nlm_out))
+result_iseloss_nlm
+
+#========================================
+#Using bandwidth from logloss in ISE
+#=======================================
+iseloss_logloss_out <- rep(NA, numouterfolds)
+se_iseloss_logloss_out <- rep(NA, numouterfolds)
+
+for(outerfolds in 1:numouterfolds){
+  
+  others_data <- splitfolder(mydata, folds, outerfolds)[[1]]
+  test_data <- splitfolder(mydata, folds, outerfolds)[[2]]
+  
+  iseloss_logloss_out[outerfolds] <- gaussian.ise(x=others_data, xtest = test_data, bw=bw_logloss_gridnlmm)
+  se_iseloss_logloss_out[outerfolds] <- se.gaussian.ise(x=others_data, xtest = test_data, bw=bw_logloss_gridnlm)
+  
+}

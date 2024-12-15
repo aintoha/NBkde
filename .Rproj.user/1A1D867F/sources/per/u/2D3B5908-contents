@@ -1,0 +1,26 @@
+
+  set.seed(2024)
+  xtrain = rnorm(10, 10, 3)
+  k = 5 # number on similar 
+  xtest = c(sample(xtrain, k), rgamma(1, 100, 0.04))
+  
+  m = length(xtest) # length of test
+  n = length(xtrain) # length of train
+  
+  dif = sapply(xtrain, function(x) (x - xtest))
+  dif_train = sapply(xtrain, function(x) (x - xtrain))
+  
+  dif1 = abs(dif)
+  dif_train1 = abs(dif_train)
+  
+  a = 1/(n * m) * sum(dif1[(k+1):m,])
+  b = ((1/(2 * n^2) - 1/(n *m)) * sum(dif_train1[1:k,])) + 
+    1/(2*n^2) * sum(dif_train1[(k+1):n,])
+  a
+  b
+  
+  a1 = apply(erf_dif, 1, mean) +  apply(exp_dif, 1, mean)
+  mean(a1)
+  b1 = ((1 / (n^2)) * sum(erf_dif_train)) + ((1/ (n^2)) * sum(exp_dif_train))
+  b1  
+  

@@ -1,0 +1,24 @@
+S11 <- matrix(c(59.2, 19.05, 19.05, 18.7), ncol =2)
+S22 <- matrix(c(124.2, 15.3, 15.3, 4.35), ncol =2)
+S12 <- matrix(c(61.05, 17.65, 17.65, 4.35), ncol =2)
+
+R <- solve(S22) %*% t(S12) %*% solve(S11) %*% S12
+sqrt(eigen(R)$values)
+
+y2 <- c(155, 149, 148, 153, 144)
+y1 <- c(191, 195, 181, 183, 176)
+y <- cbind(y1, y2)
+S11 <- cov(y)
+
+x1 <- c(179, 201, 185, 188, 171)
+x2 <- c(145, 152, 149, 149, 142)
+x <- cbind(x1, x2)
+S22 <- cov(x)
+
+S12 <- cov(x,y)
+R <- solve(S11) %*% (S12) %*% solve(S22) %*% t(S12)
+sqrt(eigen(R)$values)
+
+cc(x,y)
+
+

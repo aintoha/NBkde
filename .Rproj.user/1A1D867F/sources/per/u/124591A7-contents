@@ -1,0 +1,12 @@
+install.packages("insuranceData")
+library(insuranceData)
+
+data(AutoCollision)
+data(dataCar)
+data(dataOhlsson)
+
+data1
+head(dataCar)
+
+data  = faithful
+head(data)

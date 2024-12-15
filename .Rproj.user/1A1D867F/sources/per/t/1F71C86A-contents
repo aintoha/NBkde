@@ -1,0 +1,79 @@
+
+# Description: This function computes the CRPS for gaussian kernel
+
+# xtest = test daa
+# xtrain = train data
+# h = bandwidth
+
+xtrain = c(1:10)
+xtest = c(2, 12)
+xtest = seq(0.5, 20.5, by = 1)
+# xtest = seq(0.5, 5, by = 1)
+h = 0
+gaussian_ibl(xtest= xtest, xtrain = xtrain, h= h)
+
+rm(list=ls())
+gaussian_ibl = function(xtest, xtrain, h){
+
+  m = length(xtest) # length of test
+  n = length(xtrain) # length of train
+
+  dif = sapply(xtrain, function(x) (x - xtest))
+  erf_dif = matrix(dif * pracma::erf(dif / (sqrt(2) * h)), nrow = m, ncol = n)
+  exp_dif = h * sqrt(2 / pi) * matrix(exp(-(dif^2) / (2 * h^2)), nrow = m, ncol = n)
+
+  dif_train = sapply(xtrain, function(x) (x - xtrain))
+  erf_dif_train = 1/2 * matrix(dif_train * pracma::erf(dif_train / (2 *h)), nrow = n, ncol = n)
+  exp_dif_train = (h / sqrt(pi)) * matrix(exp(-(dif_train^2) / (4 * h^2)), nrow = n, ncol = n)
+
+  score = apply(erf_dif, 1, mean) +  apply(exp_dif, 1, mean) -
+    ((1 / (n^2)) * sum(erf_dif_train)) - ((1/ (n^2)) * sum(exp_dif_train))
+
+  # score = ((1 / (m * n)) * sum(erf_dif)) + (h * sqrt(2 / pi) * (1 / (m * n)) * sum(exp_dif)) -
+    # ((1 / (2* n^2)) * sum(erf_dif_train)) - ((h/ (n^2 * sqrt(pi))) * sum(exp_dif_train))
+
+  avg_score = mean(score)
+
+  return(avg_score)
+
+}
+
+set.seed(2024)
+h = seq(0.00001, 0.2, by = 0.00002)
+# xtrain = qnorm(ppoints(10)) #data
+xtrain = rnorm(10, 10, 1)
+xtest = c(xtrain[1:10], rnorm(1, 10, 1))
+# xtest = c(sample(xtrain, 1)) #, rnorm(4, 1, 1))
+score = rep(NA, length(h))
+for(i in 1:length(h)){
+
+    score[i] = gaussian_ibl(xtest= xtest, xtrain = xtrain, h= h[i])
+
+}
+min_binwidth = h[which.min(score)]
+print(min_binwidth)
+plot(h, score, type = 'l')
+
+
+
+
+score
+print(paste("min. bandwidth", sep=":", h[which.min(score)]))
+which.min(score)
+print(paste("min. loss", sep=":", min(score)))
+m = length(xtest)
+n = length(xtrain)
+print(paste("size of training", sep=":", n))
+print(paste("size of test", sep=":", m-len))
+sqrt(2)*n - len
+
+# D* \ne D
+#4/9 (n/N)
+# if h goes to infinity, score goes to infinity
+# if h goes to 0, score goes to infinity
+
+# D* = D
+# if h goes to infinity, score goes to infinity
+# if h goes to 0, score goes to 0
+
+

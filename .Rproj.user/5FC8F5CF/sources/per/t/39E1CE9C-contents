@@ -1,0 +1,100 @@
+# Gaussian KDE Log-loss
+
+#Usage:
+#-----------
+# set.seed(1002)
+# data <- rnorm(10)
+# x <- 0.5
+# bandwidth <- seq(0.1, to = 1, by = 0.1)
+# a <- rep(NA, length(bandwidth))
+#
+# for (i in 1:length((bandwidth))){
+#
+#   a[i] = gaussian.pdf.logloss(x, data, bandwidth[i])
+#
+# }
+# a
+# plot(x = bandwidth, y = a)
+# which.min(a)
+
+gaussian.pdf.logloss <- function(x, data, bandwidth){
+
+
+  return(mean(- (gaussianPDF(x = x, data = data, bandwidth = bandwidth))))
+
+}
+
+
+# Gaussian Distribution Function IBL
+#====================================
+
+#usage
+#------
+
+set.seed(1001)
+data <- rnorm(10)
+x <- 0.5
+bandwidth <- seq(from = 0.1, to =1, by = 0.1)
+a <- rep(NA, length(bandwidth))
+
+for (i in 1:length((bandwidth))){
+
+  a[i] = gaussian.cdf.ibl(x, data, bandwidth[i])
+
+}
+a
+plot(x = bandwidth, y = a)
+which.min(a)
+
+gaussian.ibl <- function(x){
+
+
+  return(x * pracma::erf(x / sqrt(2)) + sqrt(2 / pi) * exp(-x^2 / 2) - 1 / pi)
+
+}
+
+
+gaussian.cdf.ibl <- function(x, data, bandwidth){
+
+  n = length(data)
+  dif = (data - x) / bandwidth
+  dif.data = sapply(data, function(x) (x - data))
+  loss = mean((dif / 2 * bandwidth) * (pracma::erf(dif / sqrt(2)) + 1) +
+               (bandwidth / sqrt(2 * pi)) * exp(- (dif / 2)^2)) +
+              (sum(1 / sqrt(n * bandwidth^2) * (dif.data / 2) * pracma::erf(dif.data / sqrt(2))) +
+              sqrt((n * bandwidth^2) /  (2 * pi)) * sum(exp(- (dif.data^2 / (2 * sqrt(n * bandwidth^2))))))
+  return(loss)
+
+}
+
+
+set.seed(1001)
+data <- rnorm(10)
+x <- 0.5
+bandwidth <- seq(from = 0.001, to =1, by = 0.01)
+a <- rep(NA, length(bandwidth))
+
+for (i in 1:length((bandwidth))){
+
+  a[i] = gaussian.ibl(x, data, bandwidth[i])
+
+}
+a
+plot(x = bandwidth, y = a, type = 'l')
+bandwidth[which.min(a)]
+
+
+gaussian.ibl <- function(x, data, bandwidth){ ## simulated observation.
+
+
+  n = length(data)
+  h = bandwidth
+  dif = (data - x)/h
+  dif.data = sapply(data, function(x) (x - data)/h)
+  loss = h * ((dif * pracma::erf(dif / sqrt(2))) + (sqrt(2/pi)* exp(- (dif^2) / 2))) -
+    h/2 * ((dif.data * pracma::erf(dif.data / sqrt(2))) + (sqrt(2/pi) * exp(-(dif.data^2)/2)))
+  mean.loss = sum(loss) / n^2
+
+  return(mean.loss )
+
+}

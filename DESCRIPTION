@@ -1,11 +1,13 @@
 Package: NBkde
 Type: Package
-Title: What the Package Does (Title Case)
+Title: Kernel Density Estimation 
 Version: 0.1.0
-Author: Who wrote it
+Author: NAT 
 Maintainer: The package maintainer <yourself@somewhere.net>
-Description: More about what it does (maybe more than one line)
-    Use four spaces when indenting paragraphs within the Description.
-License: What license is it under?
+Description: This package is used Naive Bayes KDE for classification task.
+RoxygenNote: 7.2.3
+LinkingTo: Rcpp
 Encoding: UTF-8
-LazyData: true
+Suggests: 
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3

@@ -1,0 +1,320 @@
+library(caret)
+library(pROC)
+library(naivebayes)
+library(dplyr)
+library(readr)
+library(ggplot2)
+library(cvTools)
+
+
+breast=read.csv("wdbc.csv", header=F)
+head(breast)
+colnames(breast) <- c("id", "diagnosis", "radius1", "texture1",
+                      "perimeter1", "area1", "smoothness1",
+                      "compactness1", "concavity1", "concave_points1", "symmetry1","fractal_dimension1",
+                      "radius2", "texture2", "perimeter2", "area2", "smootheness2", "compactness2",
+                      "concavity2", "concave_points2", "symmetry2", "fractal_dimension2",
+                      "radius3", "texture3", "perimeter3", "area3", "smootheness3", "compactness3",
+                      "concavity3", "concave_points3", "symmetry3", "fractal_dimension3")
+breast = breast[1:100, -c(10:20) ]
+
+breast <- subset(breast, select = -id) # remove id column
+class <- breast$diagnosis
+breast <- breast[, -which(names(breast)=="diagnosis")] # remove diagnosis column
+breast <- cbind(breast, class) # add back as last column
+breast
+
+data <- breast
+nrow(data)
+ncol(data)
+
+# set the number of folds for k-fold cross-validation
+Fold <- 5
+epsilon <- 1e-15  # small epsilon value to prevent log(0)
+
+# create an empty vector to store the average log loss for the "M" class
+log_loss_value_M <- numeric(Fold)
+
+# define the log loss function for binary classification
+log_loss_binary <- function(actual, predicted) {
+  -mean(ifelse(actual == 1, log(predicted), log(1 - predicted)))
+}
+
+
+accuracy_values <- numeric(Fold)
+fscore_values <- numeric(Fold)
+roc_auc_values <- numeric(Fold)
+
+###### naive bayes ######
+
+# perform k-fold cross-validation
+set.seed(123) 
+folds <- createFolds(data$class, k = Fold)
+
+for (k in 1:Fold) {
+  # splitting dataset
+  train_indices <- folds[[k]]
+  traindata <- data[-train_indices, ]
+  testdata <- data[train_indices, ]
+  
+  # fitting Naive Bayes without KDE model using train data
+  model1 <- naive_bayes(class ~ ., data = traindata, usekernel = FALSE)
+  
+  # extracting features for prediction (exclude the "class" column)
+  testdata_features <- testdata[, -which(names(testdata) == "class")]
+  
+  # predict class probabilities with the Naive Bayes model on test data
+  predicted_probs <- predict(model1, newdata = testdata_features, type = "prob")
+  
+  # calculate log loss for the "M" class with probability clipping
+  actual_class_M <- ifelse(testdata$class == "M", 1, 0)
+  predicted_probs_M <- pmax(epsilon, pmin(1 - epsilon, predicted_probs[, "M"]))  # clip probabilities
+  log_loss_value_M[k] <- log_loss_binary(actual_class_M, predicted_probs_M)
+  
+  # predicted classes (binary)
+  predicted_classes <- ifelse(predicted_probs_M > 0.5, 1, 0)
+  
+  # confusion matrix
+  confusion_matrix <- confusionMatrix(data=factor(predicted_classes), reference=factor(actual_class_M))
+  
+  # accuracy
+  accuracy_values[k] <- confusion_matrix$overall["Accuracy"]
+  
+  # f-score
+  fscore_values[k] <- confusion_matrix$byClass["F1"]
+  
+  # ROC and AUC
+  roc_curve <- roc(actual_class_M, predicted_probs_M)
+  roc_auc_values[k] <- auc(roc_curve)
+}
+
+average_log_loss_M <- mean(log_loss_value_M)
+average_accuracy <- mean(accuracy_values)
+average_fscore <- mean(fscore_values)
+average_roc_auc <- mean(roc_auc_values)
+
+cat("Average Log Loss for 'M' Class (No KDE):", average_log_loss_M)
+cat("Average F-score:", average_fscore, "\n")
+cat("Average ROC AUC:", average_roc_auc, "\n")
+cat("Average Accuracy:", average_accuracy, "\n")
+
+
+##### naive bayes kde #####
+# perform k-fold cross-validation
+set.seed(123)
+folds <- createFolds(data$class, k = Fold)
+
+kernel_types <- c("gaussian", "epanechnikov")
+bw_methods <- c("nrd0", "sj")
+log_loss_values <- list()
+
+# initialize
+average_log_loss_values <- numeric()
+average_accuracy_values <- numeric()
+average_fscore_values <- numeric()
+average_roc_auc_values <- numeric()
+log_loss_value_M <- numeric(Fold)
+accuracy_values <- numeric(Fold)
+fscore_values <- numeric(Fold)
+roc_auc_values <- numeric(Fold)
+
+for (kernel_type in kernel_types) {
+  for (bw_method in bw_methods) {
+    for (k in 1:Fold) {
+      # splitting dataset
+      train_indices <- folds[[k]]
+      traindata <- data[-train_indices, ]
+      testdata <- data[train_indices, ]
+      
+      # fitting Naive Bayes with KDE model using train data and the current kernel and bandwidth method
+      model <- naive_bayes(class ~ ., data = traindata, usekernel = TRUE, kernel = kernel_type, bw = bw_method)
+      
+      # extracting features for prediction (exclude the "class" column)
+      testdata_features <- testdata[, -which(names(testdata) == "class")]
+      
+      # predict class probabilities with the Naive Bayes model on test data
+      predicted_probs <- predict(model, newdata = testdata_features, type = "prob")
+      
+      # calculate log loss for the "M" class with probability clipping
+      actual_class_M <- ifelse(testdata$class == "M", 1, 0)
+      predicted_probs_M <- pmax(epsilon, pmin(1 - epsilon, predicted_probs[, "M"]))  # clip probabilities
+      log_loss_value_M[k] <- log_loss_binary(actual_class_M, predicted_probs_M)
+      
+      # predicted classes (binary)
+      predicted_classes <- ifelse(predicted_probs_M > 0.5, 1, 0)
+      
+      # confusion matrix
+      confusion_matrix <- confusionMatrix(data = factor(predicted_classes), reference = factor(actual_class_M))
+      
+      # accuracy
+      accuracy_values[k] <- confusion_matrix$overall["Accuracy"]
+      
+      # f-score
+      fscore_values[k] <- confusion_matrix$byClass["F1"]
+      
+      # ROC and AUC
+      roc_curve <- roc(actual_class_M, predicted_probs_M)
+      roc_auc_values[k] <- auc(roc_curve)
+    }
+    
+    # average evaluation metrics for the current variant
+    average_log_loss_M <- mean(log_loss_value_M)
+    average_accuracy <- mean(accuracy_values)
+    average_fscore <- mean(fscore_values)
+    average_roc_auc <- mean(roc_auc_values)
+    
+    # store the average log loss for the current variant
+    log_loss_values[[paste(kernel_type, "_kernel_", bw_method, "_bw", sep = "")]] <- average_log_loss_M
+    
+    # append the average evaluation metrics to the vectors
+    average_log_loss_values <- c(average_log_loss_values, average_log_loss_M)
+    average_accuracy_values <- c(average_accuracy_values, average_accuracy)
+    average_fscore_values <- c(average_fscore_values, average_fscore)
+    average_roc_auc_values <- c(average_roc_auc_values, average_roc_auc)
+    
+    cat("Average Log Loss for 'M' Class (Kernel = ", kernel_type, ", bw = ", bw_method, "):", average_log_loss_M, "\n")
+    cat("Average F-score:", average_fscore, "\n")
+    cat("Average ROC AUC:", average_roc_auc, "\n")
+    cat("Average Accuracy:", average_accuracy, "\n")
+  }
+}
+
+
+##### naive bayes kde #####
+# perform k-fold cross-validation
+breast=read.csv("wdbc.csv", header=F)
+head(breast)
+colnames(breast) <- c("id", "diagnosis", "radius1", "texture1",
+                      "perimeter1", "area1", "smoothness1",
+                      "compactness1", "concavity1", "concave_points1", "symmetry1","fractal_dimension1",
+                      "radius2", "texture2", "perimeter2", "area2", "smootheness2", "compactness2",
+                      "concavity2", "concave_points2", "symmetry2", "fractal_dimension2",
+                      "radius3", "texture3", "perimeter3", "area3", "smootheness3", "compactness3",
+                      "concavity3", "concave_points3", "symmetry3", "fractal_dimension3")
+breast = breast[1:100, 1:5 ]
+
+breast <- subset(breast, select = -id) # remove id column
+class <- breast$diagnosis
+breast <- breast[, -which(names(breast)=="diagnosis")] # remove diagnosis column
+breast <- cbind(breast, class) # add back as last column
+breast
+
+data <- breast
+nrow(data)
+n.col = ncol(data)
+# perform k-fold cross-validation
+set.seed(123) 
+folds <- createFolds(data$class, k = Fold)
+# set the number of folds for k-fold cross-validation
+Fold <- 5
+epsilon <- 1e-15  # small epsilon value to prevent log(0)
+
+# create an empty vector to store the average log loss for the "M" class
+log_loss_value_M <- numeric(Fold)
+
+# define the log loss function for binary classification
+log_loss_binary <- function(actual, predicted) {
+  -mean(ifelse(actual == 1, log(predicted), log(1 - predicted)))
+}
+
+
+accuracy_values <- numeric(Fold)
+
+
+# initialize
+
+average_accuracy_values <- numeric()
+average_fscore_values <- numeric()
+average_roc_auc_values <- numeric()
+log_loss_value_M <- numeric(Fold)
+accuracy_values <- numeric(Fold)
+
+for (k in 1:Fold) {
+      # splitting dataset
+      train_indices <- folds[[k]]
+      traindata <- data[-train_indices, ]
+      testdata <- data[train_indices, ]
+    
+
+      # fitting Naive Bayes with KDE model using train data and the current kernel and bandwidth method
+      model3 <- fit.classKde(X = traindata[,-n.col], 
+                             Y = traindata[, n.col], 
+                             H = ks::Hns(traindata[,-n.col]))
+      
+      # extracting features for prediction (exclude the "class" column)
+      testdata_features <- testdata[, -which(names(testdata) == "class")]
+      
+      # predict class probabilities with the Naive Bayes model on test data
+      predicted_prob3 <- predict.mkde(model3, testdata = testdata_features)$posterior_probability
+      
+      # calculate log loss for the "M" class with probability clipping
+      actual_class_M <- ifelse(testdata$class == "M", 1, 0)
+      predicted_probs_M <-predicted_prob3[, "M"]  # clip probabilities
+     
+      # predicted classes (binary)
+      predicted_classes <- ifelse(predicted_probs_M > 0.5, 1, 0)
+      
+      # confusion matrix
+      confusion_matrix <- confusionMatrix(data = factor(predicted_classes), reference = factor(actual_class_M))
+      
+      # accuracy
+      accuracy_values[k] <- confusion_matrix$overall["Accuracy"]
+      
+    # average evaluation metrics for the current variant
+      average_accuracy <- mean(accuracy_values)
+  
+}
+average_accuracy 
+
+
+accuracy_values <- numeric(Fold)
+
+
+# initialize
+
+average_accuracy_values4 <- numeric()
+accuracy_values4 <- numeric(Fold)
+for (k in 1:Fold) {
+  # splitting dataset
+  train_indices <- folds[[k]]
+  traindata <- data[-train_indices, ]
+  testdata <- data[train_indices, ]
+  
+  
+  
+  
+  # fitting Naive Bayes with KDE model using train data and the current kernel and bandwidth method
+  model4 <- ks::kda(x = traindata[, 1:3], x.group  = traindata[,4], 
+                    hs = ks::Hns(traindata[,1:3]))
+  
+  # extracting features for prediction (exclude the "class" column)
+  testdata_features <- testdata[, -which(names(testdata) == "class")]
+  
+  # predict class probabilities with the Naive Bayes model on test data
+  predicted_prob4 <- predict(model4, x = testdata_features)
+
+  # predicted classes (binary)
+  predicted_classes4 <- ifelse(predicted_prob4 == "M", 1, 0)
+  
+  actual_class_M4<- ifelse(testdata$class == "M", 1, 0)
+  # confusion matrix
+  confusion_matrix4 <- confusionMatrix(data = factor( predicted_classes4), reference = factor(actual_class_M4))
+  
+  # accuracy
+  accuracy_values4[k] <- confusion_matrix4$overall["Accuracy"]
+  
+  # average evaluation metrics for the current variant
+  average_accuracy4 <- mean(accuracy_values4)
+  
+}
+
+average_accuracy4
+model4$H
+model3$bandwidth
+
+
+#---------------------------------------------------------------------
+# Bandwith tuning
+#-----------------------
+
+

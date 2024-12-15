@@ -1,0 +1,116 @@
+library(rsample)  # data splitting 
+library(dplyr)    # data transformation
+library(ggplot2)  # data visualization
+library(caret)    # implementing with caret
+library(h2o)      # implementing with h2o
+library(modeldata)
+library(tidyr)
+
+
+data(attrition)
+
+# conver some numeric variables to factors
+attrition <- attrition %>%
+  mutate(
+    JobLevel = factor(JobLevel),
+    StockOptionLevel = factor(StockOptionLevel),
+    TrainingTimesLastYear = factor(TrainingTimesLastYear)
+  )
+
+# Create training (70%) and test (30%) sets for the attrition data.
+# Use set.seed for reproducibility
+set.seed(123)
+split <- initial_split(attrition, prop = .7, strata = "Attrition")
+train <- training(split)
+test  <- testing(split)
+
+# distribution of Attrition rates across train & test set
+table(train$Attrition) %>% prop.table()
+## 
+##       No      Yes 
+## 0.838835 0.161165
+table(test$Attrition) %>% prop.table()
+## 
+##        No       Yes 
+## 0.8386364 0.1613636
+
+train %>%
+  filter(Attrition == "Yes") %>%
+  select_if(is.numeric) %>%
+  cor() %>%
+  corrplot::corrplot()
+
+train %>% 
+  select(Age, DailyRate, DistanceFromHome, HourlyRate, MonthlyIncome, MonthlyRate) %>% 
+  gather(metric, value) %>% 
+  ggplot(aes(value, fill = metric)) + 
+  geom_density(show.legend = FALSE) + 
+  facet_wrap(~ metric, scales = "free")
+
+
+# create response and feature data
+features <- setdiff(names(train), "Attrition")
+x <- train[, features]
+y <- train$Attrition
+
+# set up 10-fold cross validation procedure
+train_control <- trainControl(
+  method = "cv", 
+  number = 10
+)
+
+# train model
+nb.m1 <- train(
+  x = x,
+  y = y,
+  method = "nb",
+  trControl = train_control
+)
+
+# results
+confusionMatrix(nb.m1)
+## Cross-Validated (10 fold) Confusion Matrix 
+## 
+## (entries are percentual average cell counts across resamples)
+##  
+##           Reference
+## Prediction   No  Yes
+##        No  75.3  8.3
+##        Yes  8.5  7.8
+##                             
+##  Accuracy (average) : 0.8311
+
+# set up tuning grid
+search_grid <- expand.grid(
+  usekernel = TRUE,
+  fL = 0:5,
+  adjust = seq(0, 5, by = 1)
+)
+
+# train model
+nb.m2 <- train(
+  x = x,
+  y = y,
+  method = "nb",
+  trControl = train_control,
+  tuneGrid = search_grid,
+  preProc = c("BoxCox", "center", "scale", "pca")
+)
+
+# top 5 modesl
+nb.m2$results %>% 
+  top_n(5, wt = Accuracy) %>%
+  arrange(desc(Accuracy))
+##   usekernel fL adjust  Accuracy     Kappa AccuracySD   KappaSD
+## 1      TRUE  1      3 0.8737864 0.4435322 0.02858175 0.1262286
+## 2      TRUE  0      2 0.8689320 0.4386202 0.02903618 0.1155707
+## 3      TRUE  2      3 0.8689320 0.4750282 0.02830559 0.0970368
+## 4      TRUE  2      4 0.8689320 0.4008608 0.02432572 0.1234943
+## 5      TRUE  4      5 0.8689320 0.4439767 0.02867321 0.1354681
+
+# plot search grid results
+plot(nb.m2)
+
+confusionMatrix(nb.m2)
+pred <- predict(nb.m2, newdata = test)
+confusionMatrix(pred, test$Attrition)

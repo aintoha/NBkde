@@ -1,0 +1,181 @@
+# Description: This function is to estimate/ optimize the bandwidth using
+#              grid search method
+
+# Arguments:
+#  1. kernel: A string. Default kernel is "Gaussian"
+#  2. loss: A string (1) logloss; (2) PSL; (3) IBL. Default loss is "logloss"
+#  3. min: The minimum value of the grid search. Default value is
+#  4. max: The maximum value of the grid search. Default value is
+#  5. by:
+
+
+logloss <- function(h, traindata, testdata){
+
+  n_train <- length(traindata)
+  n_test <- length(testdata)
+  #h <-log(h)
+  norm <- 1/(sqrt(2*pi)* h)
+  train_rep <- replicate(n_test, traindata)
+  t_train_rep <- t(train_rep)
+  test_rep <- replicate(n_train, testdata)
+  D <- t_train_rep - test_rep
+
+  kern <- exp(-(D^2)/(2*h^2))*norm
+  fx <- apply(kern, 1, mean)
+  logfx <- -log(fx)
+  loss <- mean(logfx)
+
+  return(loss)
+
+}
+
+#################################################################
+
+# Description: This is a function that is used to estimate the logloss
+#              from of a predicted pdf using KDE methods
+
+#             The logloss is defined as
+#             L_{p} = -log(p) where p is the pdf estimated
+
+# require: require(distr6)
+
+# Usage:logloss()
+
+
+# Arguments:
+# 1. train: Data that is used
+# 2. test: data in which we would like to evaluate at
+# 3. kernel: kernel that would like to use. Must be a string. Choices of kernels are
+#            "gaussian", "epanechnikov", "logistic", "uniform"
+# 4. bw: The bandwidth used to estimate the
+
+# Values:
+#1. x: the test data
+#2. kernel: the kernel used
+#3. bandwidth: the bandwidth used to estimate the pdf
+#4. pdf: the pdf evaluated at the test point using the bandwidth, bw
+#4. Logloss: The loss that is obained using the bandwidth
+
+# Example:
+
+# train <- rnorm(10, 10, 1)
+# test <- rnorm(1, 10, 1)
+# log.loss(train = train, test = test, bw = 1, kernel = "gaussian")
+
+log.loss <- function(train, test, bw, kernel) {
+
+  if (!is.vector(train) | !is.vector(test)) {
+
+    stop ("train or test must be a vector")
+
+  }
+
+  if (missing(kernel)) {
+
+    kernel = "gaussian"
+
+  }
+
+  list_kernel = c("gaussian", "epanechnikov", "unifrom", "logistic")
+
+  if (!(kernel %in% list_kernel)) {
+
+    stop("kernel not supported")
+
+  }
+
+  if (missing(bw)) {
+
+    bw <- bw.rd0(train)
+
+  }
+
+  n_train <- length(train) #number of data point in train set
+  n_test <- length(test) # number of data point in test set
+
+  if (kernel == "gaussian") {
+
+    pdf = ks::kde(x=train, h = bw, eval.points = test)$estimate
+
+  }  else {
+
+
+
+      if (kernel == "uniform") {
+
+      pdf = distr6::UniformKernel$new()$pdf()
+
+      }
+    }
+
+  loss <- -log(pdf)
+  logloss <- mean(loss)
+
+  structure(list(test = test, PDF = pdf, Kernel = kernel, Bandwidth =bw, Logloss = logloss))
+
+}
+
+##########################################################
+
+# Function:grid_loss()
+
+# Description: This function is to conduct grid search using some loss functions
+#              (log-loss)
+
+# Usage:
+
+# Arguments:
+
+#   train: train data
+#   test: test data
+#   from: The minimum bandwidth
+#   to: The maximum bandwith
+#   by: The difference between each bandwidth
+
+# Details: Now use log-loss
+
+# Value: The output is the bandwidth with the lowest loss
+
+# Example:
+
+# train <- rnorm(100, 50, 1)
+# test <- rnorm(2, 50, 1)
+# grid.loss(train=train, test=test)
+
+
+grid.loss <- function(train, test, kernel, from, to, by){
+
+  if (missing(from)){
+
+    from = 0.06250000
+  }
+
+  if (missing(to)){
+
+    to = 4.000
+  }
+
+  if (missing(by)){
+
+    by =0.1
+  }
+
+  if (missing(kernel)) {
+
+    kernel = "gaussian"
+
+  }
+
+  bw <- seq(from = from, to = to, by = by)
+  n_bw <- length(bw)
+  loss <- rep(NA, n_bw)
+  for (w in 1:length(bw)){
+
+    loss[w] = log.loss(train = train, test = test, bw = bw[w], kernel = kernel)$Logloss
+  }
+
+  min_bw <- bw[which.min(loss)]
+  return(min_bw)
+}
+
+

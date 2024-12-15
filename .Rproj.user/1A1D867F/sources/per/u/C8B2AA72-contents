@@ -1,0 +1,61 @@
+gaussian_ibl_single = function(xtest, xtrain, h){
+  
+  n = length(xtrain) # length of train
+  
+  dif = sapply(xtrain, function(x) (x - xtest))
+  erf_dif = dif * pracma::erf(dif / (h))
+  exp_dif = exp(-(dif^2) / (2 * h^2))
+  
+  dif_train = sapply(xtrain, function(x) (x - xtrain))
+  erf_dif_train = dif_train * pracma::erf(dif_train / (2 *h))
+  exp_dif_train = exp(-(dif_train^2) / (4 * h^2))
+  
+  score = ((1 / (n)) * sum(erf_dif)) + (h * sqrt(2 / pi) * (1 / (n)) * sum(exp_dif)) -
+    ((1 / (2* n^2)) * sum(erf_dif_train)) - ((h/ (n^2 * sqrt(pi))) * sum(exp_dif_train))
+
+  return(score)
+  
+}
+
+xtrain = rnorm(10, mean = 10, sd = 0.1)
+xtest = rgamma(10, 100, 10)
+h = 0.1
+gaussian_ibl_single(xtest, xtrain, h)
+
+set.seed(2024)
+h = seq(0,150, by = 2)
+# xtrain = qnorm(ppoints(5)) #data
+xtrain = rnorm(50, 100, 3)
+
+xtest = c(xtrain[:99], 0.01)
+score = rep(NA, length(h))
+for(i in 1:length(h)){
+  
+  score[i] = gaussian_ibl_single(xtest= xtest, xtrain = xtrain, h= h[i])
+  
+}
+min_binwidth = h[which.min(score)]
+print(min_binwidth)
+plot(h, score, type = 'l')
+
+
+
+
+
+gaussian_ibl_avg = function(xtrain, xtest, h){
+  
+  m = length(xtest)
+  score = rep(NA, m)
+  
+  for(i in 1:m){
+    
+    score[i] = gaussian_ibl_single(xtest = xtest[i], xtrain = xtrain, h = h)
+  }
+  
+  mean_score = mean(score)
+  
+  return(mean_score)
+  
+}
+
+gaussian_ibl_avg(xtrain = xtrain, xtest = xtest, h = h)

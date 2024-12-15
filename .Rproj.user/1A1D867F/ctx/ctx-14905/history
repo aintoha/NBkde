@@ -1,0 +1,512 @@
+bw_matrix = h
+# no. of column is number of class
+# no. of row is number of variables
+colnames(bw_matrix) <- class_name
+rownames(bw_matrix) <- names(x)
+prior_matrix <- matrix(prior, nrow = 1)
+colnames(prior_matrix) <- class_name
+structure(list(data = list(x = x, y = y), prior = prior_matrix,
+bandwidth= bw_matrix))
+}
+x <- iris[, 1:4]
+y <- iris[,5]
+fit <- fit_nbkde(x, y)
+predict.nbkde(fit, newdata = iris[1:2, 1:4], type = "probability")
+predict(m1, iris[1:2, 1:4], type = 'prob')
+fit$bandwidth
+sum_prob
+prob_pdf
+# sum of product pdf for all classes
+sum_prob = as.matrix(apply(prob_pdf, 1, sum), byrow = F, nrow = n_test)
+sum_prob
+# sum of product pdf for all classes
+sum_prob = as.matrix(apply(prob_pdf, 1, sum), byrow = T, ncol = n_test)
+sum_prob
+# sum of product pdf for all classes
+sum_prob = as.matrix(apply(prob_pdf, 1, sum), byrow = FALSE, ncol = n_test)
+sum_prob
+# sum of product pdf for all classes
+sum_prob = matrix(apply(prob_pdf, 1, sum), byrow = FALSE, ncol = n_test)
+# sum of product pdf for all classes
+sum_prob = matrix(apply(prob_pdf, 1, sum), byrow = FALSE, ncol = nrow(newdata))
+sum_prob
+p_class = matrix(NA, nrow = nrow(newdata), ncol = n_class)
+for (k in 1:n_class) {
+for (i in 1:nrow(newdata)) {
+p_class[i,k ] = prob_pdf[i ,k]/sum_prob[, i]
+}
+}
+p_class
+predict(m1, iris[1:2, 1:4], type = 'prob')
+fit_nbkde = function(x, y, bw = "Silverman") {
+n_x = ncol(x) # no. of column in x
+n_class = length(unique(y)) # no. of class
+class_name = unique(y) #name of the class
+prior = rep(NA, n_class)
+for (k in 1:n_class) {
+class = noquote(as.character(unique(y)))
+prior[k] = length(which(y == class[k]))/length(y)
+}
+length_prior = length(prior) # no. of prior
+if (length_prior != n_class) {
+stop("prior must have the same length as the number or class")
+}
+if (sum(prior) != 1) {
+stop("sum of prior must equal to 1")
+}
+data <- cbind(x, y)
+subset_data = subset.data(data)
+h = matrix(NA, ncol = n_class, nrow = n_x)
+if (is.character(bw)) {
+if (bw == "Silverman") {
+for (j in 1:n_class) {
+for (i in 1:n_x) {
+h[i, j] = round(bw.nrd0(subset_data[[j]][,i]),4)
+}
+}
+} else if (bw == "SJ") {
+for (j in 1:n_class) {
+for (i in 1:n_x) {
+h[i, j] = bw.SJ(subset_data[[j]][,i])
+}
+}
+}
+}
+if (is.null(bw)) {
+ind = list()
+train = list()
+test = list()
+for (k in 1:n_class) {
+ind[[k]] <- sample(2, nrow(subset_data[[k]]),
+replace = T, prob = c(0.8, 0.2))
+train[[k]] <- subset_data[[k]][ind[[k]] == 1,]
+test[[k]] <- subset_data[[k]][ind[[k]] == 2,]
+for (i in 1:n_x) {
+h[i,k] = grid_loss(train = train[[k]][, i], test = test[[k]][,i])
+}
+}
+}
+if (is.numeric(bw)) {
+if (length(bw) != n_x * n_class) {
+stop("Number of bandwidth is invalid")
+} else {
+h= matrix(bw, byrow = T, ncol = n_class)
+}
+}
+if (is.matrix(bw)) {
+if (nrow(bw) != n_x) {
+stop("Number of row for bandwidth is invalid. Number of column must equal to number of class")
+}
+if (ncol(bw) != n_class) {
+h = matrix(rep(bw, n_class), ncol= n_class)
+}
+}
+if (is.matrix(bw)) {
+if (nrow(bw) == n_x) {
+if (ncol(bw) == n_class) {
+h =bw
+}
+}
+}
+bw_matrix = h
+# no. of column is number of class
+# no. of row is number of variables
+colnames(bw_matrix) <- class_name
+rownames(bw_matrix) <- names(x)
+prior_matrix <- matrix(prior, nrow = 1)
+colnames(prior_matrix) <- class_name
+structure(list(data = list(x = x, y = y), prior = prior_matrix,
+bandwidth= bw_matrix))
+}
+predict.nbkde <- function(object, newdata = NULL, type = c("class", "probability")) {
+if (is.null(newdata)){
+newdata = object$data$x
+}
+# if newdata is NULL then use the data in object
+subset_traindata = subset.data(cbind(object$data$x, object$data$y))
+# subset the traindata
+n_variable = ncol(cbind(object$data$x, object$data$y))
+n_class = length(object$prior)
+#number of class
+class_name = unique(object$data$y)
+#name of the class
+n_x = ncol(object$data$x)
+#number of variables
+if (type == "probability") {
+data = list()
+pdf = list()
+for(k in 1:n_class) {
+data[[k]]= subset_traindata[[k]]
+pdf [[k]] = multiple.pdf(traindata = data[[k]][,-n_variable ],
+testdata = newdata, h = object$bandwidth[,k])
+}
+# use the train data (object$x) to predict the pdf of the newdata
+# predict the probability
+#----------------------
+prod_pdf = list()
+for (k in 1:n_class) {
+prod_pdf[[k]] = data.frame(unlist(pdf[[k]])) %>% mutate(Prod = Reduce(`*`, .))
+}
+# multiply Product pdf with the prior
+prob_pdf = matrix(NA, nrow = nrow(newdata), ncol = n_class)
+# empty matrix to store the product
+for (k in 1:n_class) {
+prob_pdf[, k]  = prod_pdf[[k]]$Prod *  object$prior[k]
+# this the probability for each pdf
+# the row is the number of test point
+# the column the number of class
+}
+# sum of product pdf for all classes
+sum_prob = matrix(apply(prob_pdf, 1, sum), byrow = FALSE, ncol = nrow(newdata))
+p_class = matrix(NA, nrow = nrow(newdata), ncol = n_class)
+# empty matrix for posterior probability
+for (k in 1:n_class) {
+for (i in 1:nrow(newdata)) {
+p_class[i,k ] = prob_pdf[i ,k]/sum_prob[, i]
+}
+}
+# calculate the posterior probability
+} else if (type == "class"){
+p_class <- object$prior
+}
+colnames(p_class) <- class_name
+structure(list(Probability = p_class))
+}
+x <- iris[, 1:4]
+y <- iris[,5]
+fit <- fit_nbkde(x, y)
+predict.nbkde(fit, newdata = iris[1:2, 1:4], type = "probability")
+predict(m1, iris[1:2, 1:4], type = 'prob')
+x <- PlantGrowth[, 1]
+PlantGrowtt
+PlantGrowth
+x <- PlantGrowth[, 1]
+y <- PlantGrowth[,2]
+fit <- fit_nbkde(x, y)
+library(NBkde)
+x <- PlantGrowth[, 1]
+y <- PlantGrowth[,2]
+fit <- fit_nbkde(x, y)
+n_x = ncol(x) # no. of column in x
+n_class = length(unique(y)) # no. of class
+class_name = unique(y) #name of the class
+prior = rep(NA, n_class)
+for (k in 1:n_class) {
+class = noquote(as.character(unique(y)))
+prior[k] = length(which(y == class[k]))/length(y)
+}
+length_prior = length(prior) # no. of prior
+if (length_prior != n_class) {
+stop("prior must have the same length as the number or class")
+}
+if (sum(prior) != 1) {
+stop("sum of prior must equal to 1")
+}
+data <- cbind(x, y)
+subset_data = subset.data(data)
+h = matrix(NA, ncol = n_class, nrow = n_x)
+n_class
+n_x
+ncol(x)
+x
+x <- as.matrix(PlantGrowth[, 1])
+fit <- fit_nbkde(x, y)
+n_x = ncol(x) # no. of column in x
+n_class = length(unique(y)) # no. of class
+class_name = unique(y) #name of the class
+prior = rep(NA, n_class)
+for (k in 1:n_class) {
+class = noquote(as.character(unique(y)))
+prior[k] = length(which(y == class[k]))/length(y)
+}
+n_x
+for (k in 1:n_class) {
+class = noquote(as.character(unique(y)))
+prior[k] = length(which(y == class[k]))/length(y)
+}
+length_prior = length(prior) # no. of prior
+if (length_prior != n_class) {
+stop("prior must have the same length as the number or class")
+}
+if (sum(prior) != 1) {
+stop("sum of prior must equal to 1")
+}
+data <- cbind(x, y)
+subset_data = subset.data(data)
+h = matrix(NA, ncol = n_class, nrow = n_x)
+if (is.character(bw)) {
+if (bw == "Silverman") {
+for (j in 1:n_class) {
+for (i in 1:n_x) {
+h[i, j] = round(bw.nrd0(subset_data[[j]][,i]),4)
+}
+}
+} else if (bw == "SJ") {
+for (j in 1:n_class) {
+for (i in 1:n_x) {
+h[i, j] = bw.SJ(subset_data[[j]][,i])
+}
+}
+}
+}
+if (is.null(bw)) {
+ind = list()
+train = list()
+test = list()
+for (k in 1:n_class) {
+ind[[k]] <- sample(2, nrow(subset_data[[k]]),
+replace = T, prob = c(0.8, 0.2))
+train[[k]] <- subset_data[[k]][ind[[k]] == 1,]
+test[[k]] <- subset_data[[k]][ind[[k]] == 2,]
+for (i in 1:n_x) {
+h[i,k] = grid_loss(train = train[[k]][, i], test = test[[k]][,i])
+}
+}
+}
+if (is.numeric(bw)) {
+if (length(bw) != n_x * n_class) {
+stop("Number of bandwidth is invalid")
+} else {
+h= matrix(bw, byrow = T, ncol = n_class)
+}
+}
+if (is.matrix(bw)) {
+if (nrow(bw) != n_x) {
+stop("Number of row for bandwidth is invalid. Number of column must equal to number of class")
+}
+if (ncol(bw) != n_class) {
+h = matrix(rep(bw, n_class), ncol= n_class)
+}
+}
+n_class
+n_x
+h = matrix(NA, ncol = n_class, nrow = n_x)
+h
+subset_data
+data
+subset_data = subset.data(data)
+subset_data
+subset(matrix(data))
+data <- as.data.frame(cbind(x, y))
+subset_data = subset.data(data)
+h = matrix(NA, ncol = n_class, nrow = n_x)
+if (is.character(bw)) {
+if (bw == "Silverman") {
+for (j in 1:n_class) {
+for (i in 1:n_x) {
+h[i, j] = round(bw.nrd0(subset_data[[j]][,i]),4)
+}
+}
+} else if (bw == "SJ") {
+for (j in 1:n_class) {
+for (i in 1:n_x) {
+h[i, j] = bw.SJ(subset_data[[j]][,i])
+}
+}
+}
+}
+if (is.null(bw)) {
+ind = list()
+train = list()
+test = list()
+for (k in 1:n_class) {
+ind[[k]] <- sample(2, nrow(subset_data[[k]]),
+replace = T, prob = c(0.8, 0.2))
+train[[k]] <- subset_data[[k]][ind[[k]] == 1,]
+test[[k]] <- subset_data[[k]][ind[[k]] == 2,]
+for (i in 1:n_x) {
+h[i,k] = grid_loss(train = train[[k]][, i], test = test[[k]][,i])
+}
+}
+}
+subset_data
+if (is.null(bw)) {
+ind = list()
+train = list()
+test = list()
+for (k in 1:n_class) {
+ind[[k]] <- sample(2, nrow(subset_data[[k]]),
+replace = T, prob = c(0.8, 0.2))
+train[[k]] <- subset_data[[k]][ind[[k]] == 1,]
+test[[k]] <- subset_data[[k]][ind[[k]] == 2,]
+for (i in 1:n_x) {
+h[i,k] = grid_loss(train = train[[k]][, i], test = test[[k]][,i])
+}
+}
+}
+h
+x <- as.matrix(PlantGrowth[, 1])
+y <- PlantGrowth[,2]
+n_x = ncol(x) # no. of column in x
+n_class = length(unique(y)) # no. of class
+class_name = unique(y) #name of the class
+prior = rep(NA, n_class)
+for (k in 1:n_class) {
+class = noquote(as.character(unique(y)))
+prior[k] = length(which(y == class[k]))/length(y)
+}
+length_prior = length(prior) # no. of prior
+if (length_prior != n_class) {
+stop("prior must have the same length as the number or class")
+}
+if (sum(prior) != 1) {
+stop("sum of prior must equal to 1")
+}
+bw
+class_name = unique(y) #name of the class
+prior = rep(NA, n_class)
+for (k in 1:n_class) {
+class = noquote(as.character(unique(y)))
+prior[k] = length(which(y == class[k]))/length(y)
+}
+length_prior = length(prior) # no. of prior
+if (length_prior != n_class) {
+stop("prior must have the same length as the number or class")
+}
+if (sum(prior) != 1) {
+stop("sum of prior must equal to 1")
+}
+data <- as.data.frame(cbind(x, y))
+subset_data = subset.data(data)
+h = matrix(NA, ncol = n_class, nrow = n_x)
+if (is.character(bw)) {
+if (bw == "Silverman") {
+for (j in 1:n_class) {
+for (i in 1:n_x) {
+h[i, j] = round(bw.nrd0(subset_data[[j]][,i]),4)
+}
+}
+} else if (bw == "SJ") {
+for (j in 1:n_class) {
+for (i in 1:n_x) {
+h[i, j] = bw.SJ(subset_data[[j]][,i])
+}
+}
+}
+}
+if (is.null(bw)) {
+ind = list()
+train = list()
+test = list()
+for (k in 1:n_class) {
+ind[[k]] <- sample(2, nrow(subset_data[[k]]),
+replace = T, prob = c(0.8, 0.2))
+train[[k]] <- subset_data[[k]][ind[[k]] == 1,]
+test[[k]] <- subset_data[[k]][ind[[k]] == 2,]
+for (i in 1:n_x) {
+h[i,k] = grid_loss(train = train[[k]][, i], test = test[[k]][,i])
+}
+}
+}
+h
+if (is.numeric(bw)) {
+if (length(bw) != n_x * n_class) {
+stop("Number of bandwidth is invalid")
+} else {
+h= matrix(bw, byrow = T, ncol = n_class)
+}
+}
+if (is.matrix(bw)) {
+if (nrow(bw) != n_x) {
+stop("Number of row for bandwidth is invalid. Number of column must equal to number of class")
+}
+if (ncol(bw) != n_class) {
+h = matrix(rep(bw, n_class), ncol= n_class)
+}
+}
+if (is.matrix(bw)) {
+if (nrow(bw) == n_x) {
+if (ncol(bw) == n_class) {
+h =bw
+}
+}
+}
+bw_matrix = h
+# no. of column is number of class
+# no. of row is number of variables
+colnames(bw_matrix) <- class_name
+rownames(bw_matrix) <- names(x)
+prior_matrix <- matrix(prior, nrow = 1)
+colnames(prior_matrix) <- class_name
+structure(list(data = list(x = x, y = y), prior = prior_matrix,
+bandwidth= bw_matrix))
+fit_nbkde = function(x, y, bw = "Silverman") {
+n_x = ncol(x) # no. of column in x
+n_class = length(unique(y)) # no. of class
+class_name = unique(y) #name of the class
+prior = rep(NA, n_class)
+for (k in 1:n_class) {
+class = noquote(as.character(unique(y)))
+prior[k] = length(which(y == class[k]))/length(y)
+}
+length_prior = length(prior) # no. of prior
+if (length_prior != n_class) {
+stop("prior must have the same length as the number or class")
+}
+if (sum(prior) != 1) {
+stop("sum of prior must equal to 1")
+}
+data <- as.data.frame(cbind(x, y))
+subset_data = subset.data(data)
+h = matrix(NA, ncol = n_class, nrow = n_x)
+if (is.character(bw)) {
+if (bw == "Silverman") {
+for (j in 1:n_class) {
+for (i in 1:n_x) {
+h[i, j] = round(bw.nrd0(subset_data[[j]][,i]),4)
+}
+}
+} else if (bw == "SJ") {
+for (j in 1:n_class) {
+for (i in 1:n_x) {
+h[i, j] = bw.SJ(subset_data[[j]][,i])
+}
+}
+}
+}
+if (is.null(bw)) {
+ind = list()
+train = list()
+test = list()
+for (k in 1:n_class) {
+ind[[k]] <- sample(2, nrow(subset_data[[k]]),
+replace = T, prob = c(0.8, 0.2))
+train[[k]] <- subset_data[[k]][ind[[k]] == 1,]
+test[[k]] <- subset_data[[k]][ind[[k]] == 2,]
+for (i in 1:n_x) {
+h[i,k] = grid_loss(train = train[[k]][, i], test = test[[k]][,i])
+}
+}
+}
+if (is.numeric(bw)) {
+if (length(bw) != n_x * n_class) {
+stop("Number of bandwidth is invalid")
+} else {
+h= matrix(bw, byrow = T, ncol = n_class)
+}
+}
+if (is.matrix(bw)) {
+if (nrow(bw) != n_x) {
+stop("Number of row for bandwidth is invalid. Number of column must equal to number of class")
+}
+if (ncol(bw) != n_class) {
+h = matrix(rep(bw, n_class), ncol= n_class)
+}
+}
+if (is.matrix(bw)) {
+if (nrow(bw) == n_x) {
+if (ncol(bw) == n_class) {
+h =bw
+}
+}
+}
+bw_matrix = h
+# no. of column is number of class
+# no. of row is number of variables
+colnames(bw_matrix) <- class_name
+rownames(bw_matrix) <- names(x)
+prior_matrix <- matrix(prior, nrow = 1)
+colnames(prior_matrix) <- class_name
+structure(list(data = list(x = x, y = y), prior = prior_matrix,
+bandwidth= bw_matrix))
+}

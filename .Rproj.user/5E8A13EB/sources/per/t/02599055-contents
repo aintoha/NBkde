@@ -1,0 +1,15 @@
+exportPattern("^[[:alpha:]]+")
+
+
+# Include the packages that are required
+
+#for multiple_pdf
+import("ks")
+
+# for predict_nbkde
+importFrom("dplyr", "arrange")
+
+#importFrom("package_name", "function1", "function2", ...)
+
+import("cvTools")
+# import("package_name")
