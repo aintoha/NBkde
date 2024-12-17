@@ -4,7 +4,7 @@
 \alias{p2norm_pdf}
 \title{L2 - norm of kernel probability density function}
 \usage{
-p2norm_pdf(data, bandwidth, kernel_name = "gaussian")
+p2norm_pdf(data, bandwidth = 1, kernel_name = "gaussian")
 }
 \arguments{
 \item{data}{a vector the windows}
@@ -34,5 +34,5 @@ x = c(0.11)
 data = c(0.2, 0.3)
 bandwidth = 1
 kernel_name = "gaussian"
-p2norm.kde(x = x, data = data , bandwidth = bandwidth, kernel_name)
+p2norm_pdf(data = data , bandwidth = bandwidth, kernel_name)
 }

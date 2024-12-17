@@ -2,9 +2,9 @@
 % Please edit documentation in R/Logloss.R
 \name{log_loss}
 \alias{log_loss}
-\title{Logloss}
+\title{Log-loss}
 \usage{
-log_loss(h, traindata, testdata)
+log_loss(x, data, bandwidth, kernel_name)
 }
 \arguments{
 \item{x}{the data to evaluate at (numeric/ vector)}

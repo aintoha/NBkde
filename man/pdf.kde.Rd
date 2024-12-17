@@ -4,7 +4,7 @@
 \alias{pdf.kde}
 \title{Probability density kernel function (pdf)}
 \usage{
-pdf.kde(x, data, bandwidth, kernel_name)
+\method{pdf}{kde}(x, data, bandwidth, kernel_name)
 }
 \arguments{
 \item{x}{a vector/ numeric the points in which we want to estimate the probability}

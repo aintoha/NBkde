@@ -1,5 +1,22 @@
 [
     {
+        "file": "C:/Users/nt2036/OneDrive - Heriot-Watt University/Nbkde/src/loss.cpp",
+        "file_last_write": 1722992301.0,
+        "definitions": [
+            {
+                "usr": "c:@F@timesTwo#$@N@Rcpp@S@Vector>#VI14#@N@Rcpp@ST>1#T@PreserveStorage#",
+                "kind": 6,
+                "parent_name": "",
+                "name": "timesTwo(Rcpp::NumericVector)",
+                "file": "C:/Users/nt2036/OneDrive - Heriot-Watt University/Nbkde/src/loss.cpp",
+                "line": 15,
+                "column": 15,
+                "hidden": false
+            }
+        ],
+        "hidden": false
+    },
+    {
         "file": "C:/Users/nt2036/OneDrive - Heriot-Watt University/R Project/NBkde/src/loss.cpp",
         "file_last_write": 1722992301.0,
         "definitions": [
